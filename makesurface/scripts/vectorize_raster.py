@@ -6,6 +6,7 @@ import numpy as np
 import tools
 from scipy.ndimage import zoom
 from scipy.ndimage.filters import median_filter, maximum_filter
+import gdal
 
 def classify(inArr, classes, weighting):
     outRas = np.zeros(inArr.shape, dtype=np.uint8)
@@ -74,43 +75,44 @@ def zoomSmooth(inArr, smoothing, inAffine):
     return inArr, oaff
 
 def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothing, band, cartoCSS, axonometrize, nosimple, setNoData, nibbleMask, outvar):
+    src = gdal.Open(infile)
+    try:
+        band = int(band)
+    except:
+        raise ValueError('Band must be an integer')
+    
+    bandData = src.GetRasterBand(band)
+    inarr = bandData.ReadAsArray()
+    oshape = np.shape(inarr)
+    oaff = Affine.from_gdal(*src.GetGeoTransform())
+    bbox = src.GetGeoTransform()
+    nodata = None
 
-    with rasterio.drivers():
-        with rasterio.open(infile, 'r') as src:
-            try:
-                band = int(band)
-            except:
-                raise ValueError('Band must be an integer')
+    if (type(setNoData) == int or type(setNoData) == float) and hasattr(inarr, 'mask'):
+        inarr[np.where(inarr.mask == True)] = setNoData
+        nodata = True
 
-            inarr = src.read_band(band)
-            oshape = src.shape
-            oaff = src.affine
+    simplest = ((bbox[1] - bbox[1]) / float(oshape[0]))
 
-            if (type(setNoData) == int or type(setNoData) == float) and hasattr(inarr, 'mask'):
-                inarr[np.where(inarr.mask == True)] = setNoData
-                nodata = True
+    if nodata == 'min':
+        maskArr = np.zeros(inarr.shape, dtype=np.bool)
+        maskArr[np.where(inarr == inarr.min())] = True
+        inarr = np.ma.array(inarr, mask=maskArr)
+        del maskArr
+    elif type(nodata) == int or type(nodata) == float:
+        maskArr = np.zeros(inarr.shape, dtype=np.bool)
+        maskArr[np.where(inarr == nodata)] = True
+        inarr = np.ma.array(inarr, mas=maskArr)
+        del maskArr
+    elif nodata == None or np.isnan(nodata) or nodata:
+        maskArr = np.zeros(inarr.shape, dtype=np.bool)
+        inarr = np.ma.array(inarr, mask=maskArr)
+        del maskArr
+    elif (type(nodata) == int or type(nodata) == float) and hasattr(inarr, 'mask'):
+        nodata = True
 
-            simplest = ((src.bounds.top - src.bounds.bottom) / float(src.shape[0]))
-
-            if nodata == 'min':
-                maskArr = np.zeros(inarr.shape, dtype=np.bool)
-                maskArr[np.where(inarr == inarr.min())] = True
-                inarr = np.ma.array(inarr, mask=maskArr)
-                del maskArr
-            elif type(nodata) == int or type(nodata) == float:
-                maskArr = np.zeros(inarr.shape, dtype=np.bool)
-                maskArr[np.where(inarr == nodata)] = True
-                inarr = np.ma.array(inarr, mas=maskArr)
-                del maskArr
-            elif src.meta['nodata'] == None or np.isnan(src.meta['nodata']) or nodata:
-                maskArr = np.zeros(inarr.shape, dtype=np.bool)
-                inarr = np.ma.array(inarr, mask=maskArr)
-                del maskArr
-            elif (type(src.meta['nodata']) == int or type(src.meta['nodata']) == float) and hasattr(inarr, 'mask'):
-                nodata = True
-
-            if nibbleMask:
-                inarr.mask = maximum_filter(inarr.mask, size=3)
+    if nibbleMask:
+        inarr.mask = maximum_filter(inarr.mask, size=3)
 
     if smoothing and smoothing > 1:
         inarr, oaff = zoomSmooth(inarr, smoothing, oaff)
