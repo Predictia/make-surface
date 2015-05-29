@@ -88,6 +88,9 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
     bbox = src.GetGeoTransform()
     nodata = None
 
+    if type(bandData.GetNoDataValue()) == float:
+        nodata = bandData.GetNoDataValue()
+
     if (type(setNoData) == int or type(setNoData) == float) and hasattr(inarr, 'mask'):
         inarr[np.where(inarr.mask == True)] = setNoData
         nodata = True
@@ -102,7 +105,7 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
     elif type(nodata) == int or type(nodata) == float:
         maskArr = np.zeros(inarr.shape, dtype=np.bool)
         maskArr[np.where(inarr == nodata)] = True
-        inarr = np.ma.array(inarr, mas=maskArr)
+        inarr = np.ma.array(inarr, mask=maskArr)
         del maskArr
     elif nodata == None or np.isnan(nodata) or nodata:
         maskArr = np.zeros(inarr.shape, dtype=np.bool)
