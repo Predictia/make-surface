@@ -95,7 +95,10 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
         inarr[np.where(inarr.mask == True)] = setNoData
         nodata = True
 
-    simplest = ((bbox[1] - bbox[1]) / float(oshape[0]))
+#    simplest = ((bbox[1] - bbox[1]) / float(oshape[0]))
+    nlat,nlon = np.shape(inarr)
+    dataY = np.arange(nlat)*bbox[5]+bbox[3]
+    simplest = ((max(dataY) - min(dataY)) / float(oshape[0]))
 
     if nodata == 'min':
         maskArr = np.zeros(inarr.shape, dtype=np.bool)
@@ -133,6 +136,7 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
         classRas, breaks = classify(inarr, int(classes), weight)
 
     # filtering for speckling
+
     classRas = median_filter(classRas, size=2)
 
     # print out cartocss for classes
