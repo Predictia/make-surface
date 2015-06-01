@@ -95,10 +95,9 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
         inarr[np.where(inarr.mask == True)] = setNoData
         nodata = True
 
-#    simplest = ((bbox[1] - bbox[1]) / float(oshape[0]))
     nlat,nlon = np.shape(inarr)
     dataY = np.arange(nlat)*bbox[5]+bbox[3]
-    simplest = ((max(dataY) - min(dataY)) / float(oshape[0]))
+    simplest = ((max(dataY) - min(dataY)) / float(oshape[1]))
 
     if nodata == 'min':
         maskArr = np.zeros(inarr.shape, dtype=np.bool)
