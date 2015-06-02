@@ -64,9 +64,9 @@ def classifyManual(inArr, classArr):
     return outRas.astype(np.uint8), breaks
 
 def zoomSmooth(inArr, smoothing, inAffine):
-    zoomReg = zoom(inArr.data, smoothing, order=0)
-    zoomed = zoom(inArr.data, smoothing, order=1)
-    zoomMask = zoom(inArr.mask, smoothing, order=0)
+    zoomReg = zoom(inArr.data, smoothing, order=0, mode='nearest')
+    zoomed = zoom(inArr.data, smoothing, order=1, mode='nearest')
+    zoomMask = zoom(inArr.mask, smoothing, order=0, mode='nearest')
     zoomed[np.where(zoomed > inArr.max())] = inArr.max()
     zoomed[np.where(zoomed < inArr.min())] = inArr.min()
     inArr = np.ma.array(zoomed, mask=zoomMask)
@@ -110,6 +110,7 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
     elif type(nodata) == int or type(nodata) == float:
         maskArr = np.zeros(inarr.shape, dtype=np.bool)
         maskArr[np.where(inarr == nodata)] = True
+        inarr[np.where(maskArr == True)] = np.nan
         inarr = np.ma.array(inarr, mask=maskArr)
         del maskArr
     elif nodata == None or np.isnan(nodata) or nodata:
@@ -124,7 +125,6 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
 
     if smoothing and smoothing > 1:
         inarr, oaff = zoomSmooth(inarr, smoothing, oaff)
-
     else:
         smoothing = 1
 
