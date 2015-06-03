@@ -85,7 +85,17 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
     bandData = src.GetRasterBand(band)
     inarr = bandData.ReadAsArray()
     oshape = np.shape(inarr)
+    
+    new_cs = osr.SpatialReference()
+    new_cs.ImportFromEPSG(4326)
+
+    if len(src.GetProjectionRef())>0:
+        old_cs = osr.SpatialReference()
+        old_cs.ImportFromWkt(src.GetProjectionRef())
+        transform = osr.CoordinateTransformation(old_cs,new_cs)
+    
     oaff = Affine.from_gdal(*src.GetGeoTransform())
+    
     bbox = src.GetGeoTransform()
     nodata = None
 
@@ -99,10 +109,21 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
     nlat,nlon = np.shape(inarr)
     dataY = np.arange(nlat)*bbox[5]+bbox[3]
     dataX = np.arange(nlon)*bbox[1]+bbox[0]
-    
-    simplestY = ((max(dataY) - min(dataY)) / float(oshape[0]))
-    simplestX = ((max(dataX) - min(dataX)) / float(oshape[1]))
-    simplest = 2*max(simplestX,simplestY)
+
+    if len(src.GetProjectionRef())>0:
+        ul = transform.TransformPoint(min(dataX),max(dataY))
+        ll = transform.TransformPoint(min(dataX),min(dataY))
+        ur = transform.TransformPoint(max(dataX),max(dataY))
+        lr = transform.TransformPoint(max(dataX),min(dataY))
+        simplestY1 = (abs(ul[1] - ll[1]) / float(oshape[0]))
+        simplestY2 = (abs(ur[1] - lr[1]) / float(oshape[0]))
+        simplestX1 = (abs(ur[0] - ul[0]) / float(oshape[1]))
+        simplestX2 = (abs(lr[0] - ll[0]) / float(oshape[1]))
+        simplest = max(simplestX1,simplestY1,simplestX2,simplestY2)
+    else:
+        simplestY = ((max(dataY) - min(dataY)) / float(oshape[0]))
+        simplestX = ((max(dataX) - min(dataX)) / float(oshape[1]))
+        simplest = 2*max(simplestX,simplestY)
 
     if nodata == 'min':
         maskArr = np.zeros(inarr.shape, dtype=np.bool)
@@ -112,7 +133,7 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
     elif type(nodata) == int or type(nodata) == float:
         maskArr = np.zeros(inarr.shape, dtype=np.bool)
         maskArr[np.where(inarr == nodata)] = True
-        inarr[np.where(maskArr == True)] = np.nan
+        inarr[np.where(inarr == nodata)] = np.nan
         inarr = np.ma.array(inarr, mask=maskArr)
         del maskArr
     elif nodata == None or np.isnan(nodata) or nodata:
@@ -161,6 +182,13 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
             if shapes == 1:
                 featurelist = []
                 for c, f in enumerate(feature['coordinates']):
+                    if len(src.GetProjectionRef())>0:
+                        for ix in range(len(f)):
+                            px = transform.TransformPoint(f[ix][0],f[ix][1])
+                            lst = list(f[ix])
+                            lst[0] = px[0]
+                            lst[1] = px[1]
+                            f[ix] = tuple(lst)
                     if len(f) > 5 or c == 0:
                         if axonometrize:
                             f = np.array(f)
@@ -169,6 +197,7 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
                              poly = Polygon(f)
                         else:
                             poly = Polygon(f).simplify(simplest / float(smoothing), preserve_topology=True)
+    
                         featurelist.append(poly)
                 if len(featurelist) != 0:
                     oPoly = MultiPolygon(featurelist)
