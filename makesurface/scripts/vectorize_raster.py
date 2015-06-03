@@ -7,11 +7,12 @@ import tools
 from scipy.ndimage import zoom
 from scipy.ndimage.filters import median_filter, maximum_filter
 import gdal
+from osgeo import osr
 
 def classify(inArr, classes, weighting):
     outRas = np.zeros(inArr.shape, dtype=np.uint8)
-    zMax = np.max(inArr)
-    zMin = np.min(inArr)
+    zMax = np.nanmax(inArr)
+    zMin = np.nanmin(inArr)
 
     if weighting == 1:
         tempArray = np.zeros(1)
@@ -38,8 +39,8 @@ def classify(inArr, classes, weighting):
 
 def classifyAll(inArr):
     outRas = np.zeros(inArr.shape, dtype=np.uint8)
-    zMax = np.max(inArr)
-    zMin = np.min(inArr)
+    zMax = np.nanmax(inArr)
+    zMin = np.nanmin(inArr)
     zRange = zMax-zMin
     classes = int(zRange)
     zInterval = zRange / float(classes)
@@ -98,6 +99,7 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
     nlat,nlon = np.shape(inarr)
     dataY = np.arange(nlat)*bbox[5]+bbox[3]
     dataX = np.arange(nlon)*bbox[1]+bbox[0]
+    
     simplestY = ((max(dataY) - min(dataY)) / float(oshape[0]))
     simplestX = ((max(dataX) - min(dataX)) / float(oshape[1]))
     simplest = 2*max(simplestX,simplestY)
