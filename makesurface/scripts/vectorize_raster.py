@@ -85,11 +85,10 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
     bandData = src.GetRasterBand(band)
     inarr = bandData.ReadAsArray()
     oshape = np.shape(inarr)
-    
-    new_cs = osr.SpatialReference()
-    new_cs.ImportFromEPSG(4326)
 
     if len(src.GetProjectionRef())>0:
+        new_cs = osr.SpatialReference()
+        new_cs.ImportFromEPSG(4326)
         old_cs = osr.SpatialReference()
         old_cs.ImportFromWkt(src.GetProjectionRef())
         transform = osr.CoordinateTransformation(old_cs,new_cs)
