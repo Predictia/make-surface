@@ -76,14 +76,17 @@ def zoomSmooth(inArr, smoothing, inAffine):
     return inArr, oaff
 
 def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothing, band, cartoCSS, axonometrize, nosimple, setNoData, nibbleMask, outvar):
+    band = int(band)
     src = gdal.Open(infile)
-    try:
-        band = int(band)
-    except:
-        raise ValueError('Band must be an integer')
-    
     bandData = src.GetRasterBand(band)
     inarr = bandData.ReadAsArray()
+
+    if (inarr is None) or (len(inarr) == 0):
+        gdal.SetConfigOption('GDAL_NETCDF_BOTTOMUP','NO')
+        src = gdal.Open(infile)
+        bandData = src.GetRasterBand(band)
+        inarr = bandData.ReadAsArray()
+    
     oshape = np.shape(inarr)
 
     if len(src.GetProjectionRef())>0:
