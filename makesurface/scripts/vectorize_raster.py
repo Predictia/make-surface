@@ -9,59 +9,17 @@ from scipy.ndimage.filters import median_filter, maximum_filter
 import gdal
 from osgeo import osr
 
-def classify(inArr, classes, weighting):
-    outRas = np.zeros(inArr.shape, dtype=np.uint8)
-    zMax = np.nanmax(inArr)
-    zMin = np.nanmin(inArr)
-
-    if weighting == 1:
-        tempArray = np.zeros(1)
-    else:
-        tempArray = np.copy(inArr.data)
-        tempArray[np.where(inArr.mask == True)] = None
-    zRange = zMax-zMin
-    zInterval = zRange / float(classes)
-    breaks = []
-
-    for i in range(classes):
-        eQint = i * zInterval + zMin
-        if weighting == 1:
-            quant = 0
-        else:
-            quant = np.percentile(tempArray[np.isfinite(tempArray)], i/float(classes) * 100)
-        cClass = weighting * eQint + (1.0 - weighting) * quant
-        breaks.append(cClass)
-        outRas[np.where(inArr > cClass)] = i
-    outRas[np.where(inArr.mask == True)] = 0
-    del tempArray
-
-    return outRas.astype(np.uint8), breaks
-
-def classifyAll(inArr):
-    outRas = np.zeros(inArr.shape, dtype=np.uint8)
-    zMax = np.nanmax(inArr)
-    zMin = np.nanmin(inArr)
-    zRange = zMax-zMin
-    classes = int(zRange)
-    zInterval = zRange / float(classes)
-    
-    outRas += 1
-    breaks = [int(zMin)]
-    for i in range(1, classes):
-        cClass = int(i * zInterval + zMin)
-        breaks.append(cClass)
-        outRas[np.where(inArr >= cClass)] = i + 1
-    outRas[np.where(inArr.mask == True)] = 0
-    return outRas.astype(np.uint8), breaks
-
 def classifyManual(inArr, classArr):
     outRas = np.zeros(inArr.shape)
     breaks = {}
     for i in range(len(classArr)):
         breaks[i + 1] = float(classArr[i])
-        outRas[np.where(inArr >= classArr[i])] = i + 1
-    outRas[np.where(inArr.mask == True)] = 0
-    breaks[0] = -999
+        if i<len(classArr)-1:
+            outRas[np.where((inArr>=classArr[i]) & (inArr<=classArr[i+1]))] = i + 1
+        else:
+            outRas[np.where(inArr >= classArr[i])] = i + 1
+    outRas[np.where(inArr.mask == True)] = np.nan
+    breaks[0] = np.nan
     return outRas.astype(np.uint8), breaks
 
 def zoomSmooth(inArr, smoothing, inAffine):
@@ -121,7 +79,7 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
         simplestY2 = (abs(ur[1] - lr[1]) / float(oshape[0]))
         simplestX1 = (abs(ur[0] - ul[0]) / float(oshape[1]))
         simplestX2 = (abs(lr[0] - ll[0]) / float(oshape[1]))
-        simplest = max(simplestX1,simplestY1,simplestX2,simplestY2)
+        simplest = 2*max(simplestX1,simplestY1,simplestX2,simplestY2)
     else:
         simplestY = ((max(dataY) - min(dataY)) / float(oshape[0]))
         simplestX = ((max(dataX) - min(dataX)) / float(oshape[1]))
@@ -153,17 +111,11 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
     else:
         smoothing = 1
 
-    if classfile:
-        with open(classfile, 'r') as ofile:
-            classifiers = ofile.read().split(',')
-            classRas, breaks = classifyManual(inarr, np.array(classifiers).astype(inarr.dtype))
-    elif classes == 'all':
-        classRas, breaks = classifyAll(inarr)
-    else:
-        classRas, breaks = classify(inarr, int(classes), weight)
-
+    with open(classfile, 'r') as ofile:
+        classifiers = ofile.read().split(',')
+        classRas, breaks = classifyManual(inarr, np.array(classifiers).astype(inarr.dtype))
+    
     # filtering for speckling
-
     classRas = median_filter(classRas, size=2)
 
     # print out cartocss for classes
@@ -175,9 +127,10 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
         outputHandler = tools.dataOutput(True)
     else:
         outputHandler = tools.dataOutput()
-
-    for i, br in enumerate(breaks): 
-        tRas = (classRas >= i).astype(np.uint8)
+    for i, br in enumerate(breaks):
+        if i==0:
+            continue
+        tRas = (classRas == i).astype(np.uint8)
         if nodata:
             tRas[np.where(classRas == 0)] = 0
         for feature, shapes in features.shapes(np.asarray(tRas,order='C'),transform=oaff):
@@ -187,16 +140,16 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
                     if len(src.GetProjectionRef())>0:
                         for ix in range(len(f)):
                             px = transform.TransformPoint(f[ix][0],f[ix][1])
-                            lst = list(f[ix])
-                            lst[0] = px[0]
-                            lst[1] = px[1]
-                            f[ix] = tuple(lst)
+                            lst = list()
+                            lst.append(px[0])
+                            lst.append(px[1])
+                            #f[ix] = tuple(lst)
                     if len(f) > 5 or c == 0:
                         if axonometrize:
                             f = np.array(f)
                             f[:,1] += (axonometrize * br)
                         if nosimple:
-                             poly = Polygon(f)
+                            poly = Polygon(f)
                         else:
                             poly = Polygon(f).simplify(simplest / float(smoothing), preserve_topology=True)
     
@@ -207,9 +160,9 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
                         'type': 'Feature',
                         'geometry': mapping(oPoly),
                         'properties': {
-                            outvar: br
+                            outvar: breaks[br]
                         }
-                        })
+                    })
     if outfile:
         with open(outfile, 'w') as ofile:
             ofile.write(json.dumps({
