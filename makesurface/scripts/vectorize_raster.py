@@ -14,11 +14,10 @@ def classifyManual(inArr, classArr):
     breaks = {}
     for i in range(len(classArr)):
         breaks[i + 1] = float(classArr[i])
-        #if i<len(classArr)-1:
-        #    outRas[np.where((inArr>=classArr[i]) & (inArr<=classArr[i+1]))] = i + 1
-        #else:
-        #    outRas[np.where(inArr >= classArr[i])] = i + 1
-        outRas[np.where(inArr >= classArr[i])] = i + 1
+        if i<len(classArr)-1:
+            outRas[np.where((inArr>=classArr[i]) & (inArr<=classArr[i+1]))] = i + 1
+        else:
+            outRas[np.where(inArr >= classArr[i])] = i + 1
     outRas[np.where(inArr.mask == True)] = np.nan
     breaks[0] = np.nan
     return outRas.astype(np.uint8), breaks
@@ -131,9 +130,9 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
     for i, br in enumerate(breaks):
         if i==0:
             continue
-        tRas = (classRas >= i).astype(np.uint8)
+        tRas = (classRas == i).astype(np.uint8)
         if nodata:
-            tRas[np.where(classRas == np.nan)] = 0
+            tRas[np.where(classRas == 0)] = 0
         for feature, shapes in features.shapes(np.asarray(tRas,order='C'),transform=oaff):
             if shapes == 1:
                 featurelist = []
