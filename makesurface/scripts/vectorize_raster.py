@@ -143,7 +143,7 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
                             lst = list()
                             lst.append(px[0])
                             lst.append(px[1])
-                            #f[ix] = tuple(lst)
+                            f[ix] = tuple(lst)
                     if len(f) > 5 or c == 0:
                         if axonometrize:
                             f = np.array(f)
