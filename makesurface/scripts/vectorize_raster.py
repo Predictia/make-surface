@@ -1,6 +1,7 @@
 import fiona, json, rasterio, click
 from rasterio import features, Affine
 from shapely.geometry import Polygon, MultiPolygon, mapping
+from shapely.geometry import polygon
 from fiona.crs import from_epsg
 import numpy as np
 import tools
@@ -133,6 +134,7 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
         tRas = (classRas == i).astype(np.uint8)
         if nodata:
             tRas[np.where(classRas == 0)] = 0
+
         for feature, shapes in features.shapes(np.asarray(tRas,order='C'),transform=oaff):
             if shapes == 1:
                 featurelist = []
@@ -144,7 +146,7 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
                             lst.append(px[0])
                             lst.append(px[1])
                             f[ix] = tuple(lst)
-                    if len(f) > 5 or c == 0:
+                    if len(f) > 3 or c == 0:
                         if axonometrize:
                             f = np.array(f)
                             f[:,1] += (axonometrize * br)
@@ -152,8 +154,11 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
                             poly = Polygon(f)
                         else:
                             poly = Polygon(f).simplify(simplest / float(smoothing), preserve_topology=True)
-    
-                        featurelist.append(poly)
+                            if c == 0:
+                                poly = polygon.orient(poly,sign=-1.0)
+                            else:
+                                poly = polygon.orient(poly,sign=1.0)
+                            featurelist.append(poly)
                 if len(featurelist) != 0:
                     oPoly = MultiPolygon(featurelist)
                     outputHandler.out({
