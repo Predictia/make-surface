@@ -128,6 +128,8 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
         outputHandler = tools.dataOutput(True)
     else:
         outputHandler = tools.dataOutput()
+    #polys = []
+    #vals = []
     for i, br in enumerate(breaks):
         if i==0:
             continue
@@ -160,14 +162,37 @@ def vectorizeRaster(infile, outfile, classes, classfile, weight, nodata, smoothi
                                 poly = polygon.orient(poly,sign=1.0)
                             featurelist.append(poly)
                 if len(featurelist) != 0:
-                    oPoly = MultiPolygon(featurelist)
+                    #polys.append(MultiPolygon(featurelist))
+                    #vals.append(breaks[br])
                     outputHandler.out({
                         'type': 'Feature',
-                        'geometry': mapping(oPoly),
+                        'geometry': mapping(MultiPolygon(featurelist)),
                         'properties': {
                             outvar: breaks[br]
                         }
                     })
+
+    #for pa in range(0,len(polys)):
+    #    for pb in range(0,len(polys)):
+    #        if pa==pb:
+    #            continue
+    #        if polys[pa].contains(polys[pb]) & (polys[pa].area>polys[pb].area):
+    #            try:
+    #                polys[pa] = polys[pa].difference(polys[pb])
+    #                print polys[pa].area
+    #                print '---'
+    #                break
+    #            except:
+    #                a = 1
+    #
+    #for pc in range(0,len(polys)):
+    #    outputHandler.out({
+    #        'type': 'Feature',
+    #        'geometry': mapping(polys[pc]),
+    #        'properties': {
+    #            outvar: vals[pc]
+    #        }
+    #    })
     if outfile:
         with open(outfile, 'w') as ofile:
             ofile.write(json.dumps({
